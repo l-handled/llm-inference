@@ -99,8 +99,7 @@ jobs:
         working-directory: ${{ github.workspace }}
         env:
           MONGODB_URI: mongodb://localhost:27017
-          QDRANT_HOST: localhost
-          QDRANT_PORT: 6333
+          QDRANT_URL: http://localhost:6333
           API_TOKEN: test-token
         run: |
           pytest src/tests/integration/ -v
