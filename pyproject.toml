@@ -1,0 +1,10 @@
+[tool.poetry]
+name = "rag-llm-pipeline"
+version = "0.1.0"
+description = "Production-ready RAG LLM inference pipeline with monitoring and cloud deployment."
+authors = ["Your Name <your.email@example.com>"]
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q --cov=src"
+testpaths = ["src/tests"] 

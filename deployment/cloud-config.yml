@@ -1,0 +1,22 @@
+# Placeholder cloud-config.yml for AWS deployment 
+
+# Example AWS ECS/EC2 deployment config
+# Fill in with your VPC, subnet, security group, and task definition details
+
+apiVersion: ecs/v1
+kind: Service
+metadata:
+  name: rag-llm-pipeline
+spec:
+  containers:
+    - name: api
+      image: <your-ecr-repo>/rag-llm-pipeline:latest
+      env:
+        - name: API_TOKEN
+          valueFrom: secretsmanager:API_TOKEN
+        - name: QDRANT_HOST
+          value: qdrant
+        - name: QDRANT_PORT
+          value: "6333"
+    - name: qdrant
+      image: qdrant/qdrant:latest 
