@@ -29,6 +29,9 @@ jobs:
         run: |
           pip install -r requirements-ai.txt
 
+      - name: Set PYTHONPATH
+        run: echo "PYTHONPATH=${{ github.workspace }}" >> $GITHUB_ENV
+
       - name: Run unit tests
         working-directory: ${{ github.workspace }}
         run: |
@@ -88,6 +91,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-core.txt
           pip install -r requirements-ai.txt
+
+      - name: Set PYTHONPATH
+        run: echo "PYTHONPATH=${{ github.workspace }}" >> $GITHUB_ENV
 
       - name: Run integration tests
         working-directory: ${{ github.workspace }}
