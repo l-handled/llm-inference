@@ -100,7 +100,7 @@ jobs:
         env:
           MONGODB_URI: mongodb://localhost:27017
           QDRANT_URL: http://localhost:6333
-          API_TOKEN: test-token
+          LANGSMITH_API_KEY: test-token
         run: |
           pytest src/tests/integration/ -v
 
