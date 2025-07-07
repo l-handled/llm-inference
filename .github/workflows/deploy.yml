@@ -53,6 +53,9 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Copy .env template for Docker build
+        run: cp deployment/secrets.template .env
+
       - name: Build and test Docker containers
         working-directory: ${{ github.workspace }}/docker
         run: |

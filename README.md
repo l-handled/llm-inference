@@ -1,6 +1,7 @@
-# Production-Ready RAG LLM Inference Pipeline
+# Production-Ready RAG LLM Inference Pipeline with some additonal Set-up
 
 This project implements a production-grade Retrieval-Augmented Generation (RAG) system with document ingestion, vector search, hybrid retrieval, monitoring, and cloud deployment support.
+Note: CI / CD requires additional work and cloud infrastructure code set up required. 
 
 ---
 
@@ -391,6 +392,11 @@ pytest --cov=src
 ---
 
 ## Quickstart
+
+```
+Running the below command will create .env file from template but the tokens need to be supplied. And the command will need to be re-run. 
+Under docker/.env - fill in LANGSMITH_API_KEY and API_TOKEN (they both can be same as the langsmith api key)
+```
 
 ```bash
 ./run_local.sh
