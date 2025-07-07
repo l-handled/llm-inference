@@ -236,7 +236,6 @@ graph TD
     B --> C[Store in MongoDB]
     C --> D{Strategy Selection}
     D -->|LangChain| E[LangChain Chunking]
-    D -->|LlamaIndex| F[LlamaIndex Chunking]
     E --> G[Generate Embeddings]
     F --> G
     G --> H[Store in Qdrant]
@@ -278,7 +277,7 @@ The project includes comprehensive testing across three categories:
 
 ### Integration Tests (`src/tests/integration/`)
 - **`test_ingest_query.py`**: End-to-end ingest and query workflow
-  - Document ingestion with both LangChain and LlamaIndex strategies
+  - Document ingestion with LangChain
   - Query processing and response validation
   - MongoDB document listing and verification
   - LangSmith traces endpoint testing
