@@ -237,7 +237,6 @@ graph TD
     C --> D{Strategy Selection}
     D -->|LangChain| E[LangChain Chunking]
     E --> G[Generate Embeddings]
-    F --> G
     G --> H[Store in Qdrant]
     H --> I[LangSmith Tracing]
     I --> J[Prometheus Metrics]
