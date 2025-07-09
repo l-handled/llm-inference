@@ -611,43 +611,69 @@ if page == "Ingest Document":
         help="Add structured metadata to help with filtering and organization"
     )
     
+    # Add chunking strategy controls
+    chunking_strategy = st.selectbox(
+        "Chunking Strategy",
+        ["langchain", "fixed", "sliding", "semantic"],
+        index=0,
+        help="How to split the document into chunks for embedding."
+    )
+    chunk_size = st.number_input(
+        "Chunk Size",
+        min_value=64,
+        max_value=4096,
+        value=512,
+        step=32,
+        help="Number of characters or approximate size per chunk."
+    )
+    overlap = st.number_input(
+        "Chunk Overlap",
+        min_value=0,
+        max_value=1024,
+        value=64,
+        step=8,
+        help="Number of overlapping characters between chunks (for sliding/langchain)."
+    )
+    
     # Processing status and results
     st.subheader("🚀 Process Document")
     
-    if st.button("📤 Start Ingestion", type="primary", disabled=not uploaded_file):
+    if st.button("\U0001F4E4 Start Ingestion", type="primary", disabled=not uploaded_file):
         if uploaded_file:
             # Prepare data
             files = {"file": (uploaded_file.name, uploaded_file.getvalue())}
-            data = {"doc_metadata": doc_metadata} if doc_metadata else {}
-            
+            data = {
+                "chunking_strategy": chunking_strategy,
+                "chunk_size": int(chunk_size),
+                "overlap": int(overlap)
+            }
+            if doc_metadata:
+                data["doc_metadata"] = doc_metadata
             # Show processing progress
-            with st.spinner("🔄 Processing document..."):
+            with st.spinner("\U0001F504 Processing document..."):
                 progress_bar = st.progress(0)
                 status_text = st.empty()
-                
-                # Simulate progress updates
                 for i in range(4):
                     progress_bar.progress((i + 1) * 25)
                     if i == 0:
-                        status_text.text("📄 Validating document...")
+                        status_text.text("\U0001F4C4 Validating document...")
                     elif i == 1:
                         status_text.text("✂️ Chunking document...")
                     elif i == 2:
-                        status_text.text("🧠 Generating embeddings...")
+                        status_text.text("\U0001F9E0 Generating embeddings...")
                     else:
-                        status_text.text("💾 Storing in database...")
+                        status_text.text("\U0001F4BE Storing in database...")
                     time.sleep(0.5)
-                
                 # Make actual API call
                 resp = requests.post(f"{API_URL}/ingest", files=files, data=data, headers=headers)
-            
+                correlation_id = resp.headers.get("X-Correlation-ID")
             progress_bar.progress(100)
-            status_text.text("✅ Processing complete!")
-            
+            status_text.text("\u2705 Processing complete!")
+
             if resp.status_code == 201:
                 result = resp.json()
                 st.success("🎉 Document successfully ingested!")
-                
+
                 # Display results
                 col1, col2, col3 = st.columns(3)
                 with col1:
@@ -656,10 +682,12 @@ if page == "Ingest Document":
                     st.metric("Status", result['status'])
                 with col3:
                     st.metric("File Size", f"{uploaded_file.size:,} bytes")
-                
+                if correlation_id:
+                    st.info(f"Correlation ID: `{correlation_id}` (for tracing/logs)")
+
                 # Show next steps
                 st.info("💡 **Next Steps**: Go to the Query tab to search through your ingested documents!")
-                
+
             else:
                 st.error(f"❌ Ingestion failed: {resp.text}")
         else:
@@ -1174,6 +1202,17 @@ elif page == "Documents":
                             if doc.get('processing_info'):
                                 st.markdown("**⚙️ Processing Information:**")
                                 st.json(doc['processing_info'])
+                            
+                            # Chunking info
+                            if 'chunking_strategy' in doc:
+                                st.markdown("**🧩 Chunking Strategy:**")
+                                st.markdown(f"`{doc['chunking_strategy']}`")
+                            if doc.get('chunk_size'):
+                                st.markdown(f"**🔢 Chunk Size:**")
+                                st.markdown(f"`{doc.get('chunk_size')}`")
+                            if doc.get('overlap'):
+                                st.markdown(f"**🔁 Overlap:**")
+                                st.markdown(f"`{doc.get('overlap')}`")
             
             else:
                 st.info("📭 No documents found matching your filters.")

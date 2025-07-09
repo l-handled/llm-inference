@@ -80,38 +80,50 @@ from concurrent.futures import ThreadPoolExecutor
 async def ingest_document(
     file: UploadFile = File(...),
     metadata: Optional[str] = Form(None),
-    strategy: Optional[str] = Form("langchain"),
+    chunking_strategy: Optional[str] = Form("langchain"),
+    chunk_size: Optional[int] = Form(512),
+    overlap: Optional[int] = Form(64),
     token: HTTPAuthorizationCredentials = Depends(security)
 ):
     """
-    Ingest a document, store in MongoDB, chunk/embed with LangChain, upsert to Qdrant.
+    Ingest a document, store in MongoDB, chunk/embed, upsert to Qdrant.
+    Supports chunking strategies: langchain, fixed, sliding, semantic.
     """
     import time
     start_time = time.time()
-    
+
     verify_token(token)
     try:
-        # Validate strategy
-        if strategy and strategy != "langchain":
-            raise HTTPException(status_code=400, detail=f"Unknown strategy: {strategy}")
-        
+        valid_strategies = {"langchain", "fixed", "sliding", "semantic"}
+        if chunking_strategy not in valid_strategies:
+            raise HTTPException(status_code=400, detail=f"Unknown chunking strategy: {chunking_strategy}")
+
         doc = await file.read()
         doc_type = file.filename.split(".")[-1].lower()
         validated = validate_document(doc, doc_type)
-        
+
         # Run the ingestion in a thread pool with timeout
         loop = asyncio.get_event_loop()
         with ThreadPoolExecutor() as executor:
             mongo_id = await asyncio.wait_for(
-                loop.run_in_executor(executor, ingest_document_rag, file.filename, validated, metadata, strategy),
+                loop.run_in_executor(
+                    executor,
+                    ingest_document_rag,
+                    file.filename,
+                    validated,
+                    metadata,
+                    chunking_strategy,
+                    chunk_size,
+                    overlap
+                ),
                 timeout=300  # 5 minutes timeout
             )
-        
+
         # Record successful metrics
         latency_ms = (time.time() - start_time) * 1000
         record_metrics("request_count", 1, endpoint="ingest", status="success")
         record_metrics("query_latency_ms", latency_ms, endpoint="ingest")
-        
+
         return IngestResponse(document_id=mongo_id, status="success")
     except asyncio.TimeoutError:
         # Record timeout metrics
@@ -131,21 +143,25 @@ async def get_documents(token: HTTPAuthorizationCredentials = Depends(security))
     """
     import time
     start_time = time.time()
-    
+
     verify_token(token)
     try:
-        docs = list(mongo_coll.find({}, {"_id": 1, "filename": 1, "doc_metadata": 1, "upload_time": 1}))
+        docs = list(mongo_coll.find({}, {"_id": 1, "filename": 1, "doc_metadata": 1, "upload_time": 1, "chunking_strategy": 1, "chunk_size": 1, "overlap": 1}))
         for d in docs:
             d["document_id"] = str(d.pop("_id"))
             # Convert None to empty string for doc_metadata
             if d.get("doc_metadata") is None:
                 d["doc_metadata"] = ""
-        
+            # Ensure chunking info is present
+            d["chunking_strategy"] = d.get("chunking_strategy", "unknown")
+            d["chunk_size"] = d.get("chunk_size", None)
+            d["overlap"] = d.get("overlap", None)
+
         # Record successful metrics
         latency_ms = (time.time() - start_time) * 1000
         record_metrics("request_count", 1, endpoint="documents", status="success")
         record_metrics("query_latency_ms", latency_ms, endpoint="documents")
-        
+
         return DocumentListResponse(documents=docs)
     except Exception as e:
         # Record error metrics
@@ -179,15 +195,15 @@ async def query_rag(
     """
     import time
     start_time = time.time()
-    
+
     verify_token(token)
     try:
         # Validate strategy if provided
         if strategy and strategy != "langchain":
             raise HTTPException(status_code=400, detail=f"Unknown strategy: {strategy}")
-        
+
         from src.storage.vector_db import query_documents
-        
+
         # Use the existing query_documents function with hybrid search
         results, latency = query_documents(
             query=request.query,
@@ -196,7 +212,7 @@ async def query_rag(
             filters=request.filters,
             use_hybrid=request.use_hybrid
         )
-        
+
         # Format results for the response
         out = []
         for result in results:
@@ -207,11 +223,11 @@ async def query_rag(
                 "filename": result.get("filename", ""),
                 "bm25": result.get("bm25", False),
             })
-        
+
         # Record successful metrics
         record_metrics("request_count", 1, endpoint="query", status="success")
         record_metrics("query_latency_ms", latency, endpoint="query")
-        
+
         return QueryResponse(results=out, latency_ms=latency)
     except Exception as e:
         # Record error metrics
@@ -246,7 +262,7 @@ async def health_check():
     """
     import datetime
     import os
-    
+
     health_status = {
         "status": "ok",
         "timestamp": datetime.datetime.utcnow().isoformat(),
@@ -255,7 +271,7 @@ async def health_check():
         "dependencies": {},
         "system": {}
     }
-    
+
     # Check MongoDB connection
     try:
         mongo_client.admin.command('ping')
@@ -269,7 +285,7 @@ async def health_check():
             "error": str(e)
         }
         health_status["status"] = "degraded"
-    
+
     # Check Qdrant connection
     try:
         from qdrant_client import QdrantClient
@@ -287,7 +303,7 @@ async def health_check():
             "error": str(e)
         }
         health_status["status"] = "degraded"
-    
+
     # Check LangSmith connection
     try:
         if settings.LANGSMITH_API_KEY:
@@ -307,13 +323,13 @@ async def health_check():
             "status": "unhealthy",
             "error": str(e)
         }
-    
+
     # System metrics (basic version without psutil for now)
     health_status["system"] = {
         "note": "Basic health check - system metrics require psutil package",
         "timestamp": datetime.datetime.utcnow().isoformat()
     }
-    
+
     return health_status
 
 @app.get("/documents/{document_id}/embeddings")
@@ -327,18 +343,18 @@ async def get_document_embeddings(document_id: str, token: HTTPAuthorizationCred
     try:
         from qdrant_client import QdrantClient
         from qdrant_client.http.models import Filter, FieldCondition, MatchValue
-        
+
         QDRANT_HOST = os.environ.get("QDRANT_HOST", "localhost")
         QDRANT_PORT = int(os.environ.get("QDRANT_PORT", "6333"))
         qdrant_client = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT, timeout=90.0)
-        
+
         # Create filter to get all chunks for this document
         qdrant_filter = Filter(must=[FieldCondition(key="mongo_id", match=MatchValue(value=document_id))])
-        
+
         # Debug logging
         logging.info(f"Searching for document_id: {document_id}")
         logging.info(f"Using filter: {qdrant_filter}")
-        
+
         # Get all points for this document
         try:
             scroll_result = qdrant_client.scroll(
@@ -354,10 +370,10 @@ async def get_document_embeddings(document_id: str, token: HTTPAuthorizationCred
         except Exception as e:
             logging.error(f"Qdrant scroll failed: {e}")
             raise HTTPException(status_code=500, detail=f"Qdrant query failed: {str(e)}")
-        
+
         if not points:
             raise HTTPException(status_code=404, detail="Document not found or no embeddings available")
-        
+
         # Format the response
         embeddings_data = []
         for i, point in enumerate(points):
@@ -373,14 +389,14 @@ async def get_document_embeddings(document_id: str, token: HTTPAuthorizationCred
                 }
             }
             embeddings_data.append(embedding_data)
-        
+
         return {
             "document_id": document_id,
             "total_chunks": len(embeddings_data),
             "embedding_dimensions": len(points[0].vector) if points and points[0].vector else 0,
             "chunks": embeddings_data
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:

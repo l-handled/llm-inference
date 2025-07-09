@@ -14,6 +14,7 @@ from src.config.settings import settings
 from urllib.parse import urlparse
 from src.monitoring.metrics import record_metrics
 import uuid
+from src.processing.chunking import chunk_document
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -33,30 +34,29 @@ QDRANT_COLLECTION = "documents"
 qdrant_client = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT, timeout=90.0)
 
 @traceable(name="ingest_document_rag")
-def ingest_document_rag(filename, doc_content, doc_metadata, strategy="langchain"):
+def ingest_document_rag(filename, doc_content, doc_metadata, strategy="langchain", chunk_size=512, overlap=64):
     """
     Store document in MongoDB, chunk/embed, upsert to Qdrant. Returns mongo_id.
-    Currently only supports LangChain strategy.
-    
+    Supports strategies: langchain, fixed, sliding, semantic.
     Args:
         filename: Name of the file being ingested
         doc_content: Content of the document
         doc_metadata: Metadata for the document
-        strategy: Processing strategy - currently only "langchain" is supported
+        strategy: Chunking strategy
+        chunk_size: Size of each chunk
+        overlap: Overlap for sliding window
     """
     logger.info(f"Starting ingestion for {filename} with strategy: {strategy}")
-    
-    # Currently only LangChain strategy is supported
-    if strategy != "langchain":
-        logger.warning(f"Strategy '{strategy}' is not supported. Using LangChain instead.")
-        strategy = "langchain"
-    
+
     # Store in MongoDB
     doc = {
         "filename": filename,
         "doc_metadata": doc_metadata,
         "upload_time": datetime.datetime.utcnow(),
         "size": len(str(doc_content)),
+        "chunking_strategy": strategy,
+        "chunk_size": chunk_size,
+        "overlap": overlap,
     }
     try:
         mongo_id = mongo_coll.insert_one(doc).inserted_id
@@ -64,23 +64,31 @@ def ingest_document_rag(filename, doc_content, doc_metadata, strategy="langchain
         logger.error(f"Failed to store document in MongoDB: {str(e)}")
         raise RuntimeError(f"Failed to store document in MongoDB: {str(e)}")
 
-    # Chunking and Embedding with LangChain
-    logger.info(f"Processing with LangChain")
-    # Handle both string and dict content
+    # Chunking
+    logger.info(f"Processing with strategy: {strategy}")
     if isinstance(doc_content, dict):
         text = json.dumps(doc_content)
+        doc_type = "json"
     else:
         text = str(doc_content)
-    
-    logger.info(f"Text length: {len(text)} characters")
-    splitter = RecursiveCharacterTextSplitter(chunk_size=512, chunk_overlap=64)
-    chunks = splitter.split_text(text)
+        doc_type = "txt"
+
+    if strategy == "langchain":
+        splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=overlap)
+        chunks = splitter.split_text(text)
+    elif strategy in ("fixed", "sliding", "semantic"):
+        chunks = chunk_document(text, doc_type, strategy=strategy, chunk_size=chunk_size, overlap=overlap)
+    else:
+        logger.warning(f"Strategy '{strategy}' is not supported. Using 'langchain' instead.")
+        splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=overlap)
+        chunks = splitter.split_text(text)
+
     logger.info(f"Created {len(chunks)} chunks")
-    
+
     # Record chunk size metrics
     for chunk in chunks:
         record_metrics("chunk_size", len(chunk))
-    
+
     logger.info("Loading HuggingFace embeddings model...")
     embedder = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
     logger.info("Generating embeddings...")
@@ -89,7 +97,7 @@ def ingest_document_rag(filename, doc_content, doc_metadata, strategy="langchain
     embedding_time = time.time() - embedding_start
     record_metrics("embedding_time", embedding_time)
     logger.info(f"Generated {len(embeddings)} embeddings in {embedding_time:.2f}s")
-    
+
     # Upsert to Qdrant
     qdrant = qdrant_client
     points = []
@@ -101,6 +109,9 @@ def ingest_document_rag(filename, doc_content, doc_metadata, strategy="langchain
             "chunk_index": i,
             "text": chunk,  # Add text content for BM25 search
             "doc_metadata": doc_metadata_dict,
+            "chunking_strategy": strategy,
+            "chunk_size": chunk_size,
+            "overlap": overlap,
         }
         # Flatten category for filtering
         if doc_metadata_dict and isinstance(doc_metadata_dict, dict) and "category" in doc_metadata_dict:

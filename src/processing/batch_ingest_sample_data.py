@@ -23,8 +23,28 @@ def main():
             with open(fpath, "rb") as f:
                 doc_bytes = f.read()
             doc_content = validate_document(doc_bytes, ext)
-            mongo_id = ingest_document_rag(fname, doc_content, doc_metadata=None, strategy="langchain")
-            logger.info(f"Ingested {fname} (mongo_id={mongo_id})")
+            # Heuristic for best chunking strategy
+            if ext == "json":
+                strategy = "semantic"
+                chunk_size = 512
+                overlap = 32
+            else:
+                text = doc_content if isinstance(doc_content, str) else str(doc_content)
+                length = len(text)
+                if length < 1000:
+                    strategy = "fixed"
+                    chunk_size = 256
+                    overlap = 0
+                elif length < 5000:
+                    strategy = "langchain"
+                    chunk_size = 512
+                    overlap = 64
+                else:
+                    strategy = "sliding"
+                    chunk_size = 512
+                    overlap = 128
+            mongo_id = ingest_document_rag(fname, doc_content, doc_metadata=None, strategy=strategy, chunk_size=chunk_size, overlap=overlap)
+            logger.info(f"Ingested {fname} (mongo_id={mongo_id}, strategy={strategy})")
         except Exception as e:
             logger.error(f"Failed to ingest {fname}: {e}")
 

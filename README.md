@@ -26,6 +26,24 @@ Note: CI / CD requires additional work and cloud infrastructure code set up requ
 - **LangSmith tracing and evaluation for all LLM/RAG requests**
 - **/langsmith_traces endpoint and UI tab for experiment tracking**
 
+# Environment Setu
+
+The `.env` file for environment variables must be placed in the `docker/` directory. When running `run_local.sh` from the project root, if `docker/.env` does not exist, it will be created from the project root `.env.template` file. You must fill in your secrets in `docker/.env` before running the pipeline.
+
+```
+Running the below command will create .env file from template but the tokens need to be supplied. And the command will need to be re-run. 
+Under docker/.env - fill in LANGSMITH_API_KEY and API_TOKEN (they both can be same as the langsmith api key)
+```
+
+local log checks: docker compose -f docker/docker-compose.yml logs api -f
+docker compose -f docker/docker-compose.yml build api
+
+## Quick Start
+1. Run `./run_local.sh` from the project root.
+2. If `docker/.env` is missing, it will be created from `.env.template` and you will be prompted to fill it in.
+3. Edit `docker/.env` with your actual secrets and configuration values.
+4. Re-run `./run_local.sh` to start the pipeline. 
+
 ## Directory Guide
 
 - [alembic/](alembic/README.md): Database migrations and schema management
@@ -391,21 +409,6 @@ pytest --cov=src
 
 ---
 
-## Quickstart
-
-```
-Running the below command will create .env file from template but the tokens need to be supplied. And the command will need to be re-run. 
-Under docker/.env - fill in LANGSMITH_API_KEY and API_TOKEN (they both can be same as the langsmith api key)
-```
-
-```bash
-./run_local.sh
-```
-
-local log checks: docker compose -f docker/docker-compose.yml logs api -f
-
-docker compose -f docker/docker-compose.yml build api
-
 ## Project Structure
 
 See the repository tree for details. All code is in `src/`.
@@ -479,12 +482,3 @@ A modern, user-friendly web UI is provided in the `ui/` directory for interactin
 
 See [ui/README.md](ui/README.md) for more details and customization options.
 
-# Environment Setup
-
-The `.env` file for environment variables must be placed in the `docker/` directory. When running `run_local.sh` from the project root, if `docker/.env` does not exist, it will be created from the project root `.env.template` file. You must fill in your secrets in `docker/.env` before running the pipeline.
-
-## Quick Start
-1. Run `./run_local.sh` from the project root.
-2. If `docker/.env` is missing, it will be created from `.env.template` and you will be prompted to fill it in.
-3. Edit `docker/.env` with your actual secrets and configuration values.
-4. Re-run `./run_local.sh` to start the pipeline. 

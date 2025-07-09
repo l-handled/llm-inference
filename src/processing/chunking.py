@@ -2,6 +2,14 @@
 Chunking module for splitting documents into smaller pieces for embedding and retrieval.
 """
 from typing import List
+import nltk
+from nltk.tokenize import sent_tokenize
+
+# Ensure punkt is downloaded (safe to call repeatedly)
+try:
+    nltk.data.find('tokenizers/punkt')
+except LookupError:
+    nltk.download('punkt')
 
 def chunk_document(document, doc_type: str, strategy: str = "fixed", chunk_size: int = 512, overlap: int = 50) -> List[str]:
     """
@@ -23,10 +31,23 @@ def chunk_document(document, doc_type: str, strategy: str = "fixed", chunk_size:
     if strategy == "fixed":
         return [text[i:i+chunk_size] for i in range(0, len(text), chunk_size)]
     elif strategy == "sliding":
+        if len(text) <= chunk_size:
+            return [text]
         return [text[i:i+chunk_size] for i in range(0, len(text)-chunk_size+1, chunk_size-overlap)]
-    # Semantic chunking placeholder
     elif strategy == "semantic":
-        # TODO: Implement semantic chunking using sentence boundaries or a model
-        return [text]
+        # Use sentence tokenization, then group sentences into chunks
+        sentences = sent_tokenize(text)
+        chunks = []
+        current_chunk = ""
+        for sent in sentences:
+            if len(current_chunk) + len(sent) + 1 <= chunk_size:
+                current_chunk += (" " if current_chunk else "") + sent
+            else:
+                if current_chunk:
+                    chunks.append(current_chunk)
+                current_chunk = sent
+        if current_chunk:
+            chunks.append(current_chunk)
+        return chunks
     else:
         raise ValueError(f"Unknown chunking strategy: {strategy}") 
