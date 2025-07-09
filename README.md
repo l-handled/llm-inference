@@ -26,7 +26,7 @@ Note: CI / CD requires additional work and cloud infrastructure code set up requ
 - **LangSmith tracing and evaluation for all LLM/RAG requests**
 - **/langsmith_traces endpoint and UI tab for experiment tracking**
 
-# Environment Setu
+# Environment Setup
 
 The `.env` file for environment variables must be placed in the `docker/` directory. When running `run_local.sh` from the project root, if `docker/.env` does not exist, it will be created from the project root `.env.template` file. You must fill in your secrets in `docker/.env` before running the pipeline.
 
