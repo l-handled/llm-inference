@@ -559,7 +559,14 @@ st.sidebar.markdown("""
     </div>
 """, unsafe_allow_html=True)
 
-page = st.sidebar.radio("Navigation", ["Ingest Document", "Query", "Documents", "Monitoring & Observability", "Documentation"])
+page = st.sidebar.radio("Navigation", [
+    "Ingest Document", 
+    "Query", 
+    "Documents", 
+    "Monitoring & Observability", 
+    "Documentation",
+    "Production Readiness: Proposed Architecture"
+])
 
 # Service status check in sidebar
 st.sidebar.markdown("---")
@@ -1970,6 +1977,70 @@ async function deleteDocument(documentId) {
     - Keep your API token secure and rotate regularly
     - Validate file uploads and metadata
     - Use HTTPS in production environments
+    """)
+
+elif page == "Production Readiness: Proposed Architecture":
+    st.header("🏗️ Production Readiness: Proposed Architecture")
+    st.markdown("""
+    This diagram illustrates a production-ready architecture for the RAG LLM system:
+    - **AWS VPC**: All resources are deployed inside a secure, private Virtual Private Cloud.
+    - **Kubernetes (EKS)**: Deployed within the VPC for container orchestration and security.
+    - **Load Balancer**: Handles incoming traffic and distributes it to the Kubernetes cluster.
+    - **Ingress Controller**: Manages external access to services, enforces HTTPS, and integrates with Route 53 for DNS.
+    - **Route 53**: Provides DNS and HTTPS-enabled web links for UI/API endpoints.
+    - **FastAPI**: The backend API, deployed in Kubernetes, handles ingestion and query requests.
+    - **UI (Streamlit)**: The user interface, also deployed in Kubernetes, interacts with the API.
+    - **MongoDB (Managed Cloud Service)**: Stores document metadata and content, integrated with Kubernetes.
+    - **Qdrant Cloud**: Vector database for embeddings and semantic search.
+    - **OpenTelemetry**: Provides logging, tracing, and metrics for observability across all services.
+    - **Ingestion Pipeline**: FastAPI ingests data into MongoDB and Qdrant.
+    - **Query Pipeline**: FastAPI reads from both MongoDB and Qdrant as required.
+    """)
+    st.markdown("""
+```mermaid
+flowchart TD
+    subgraph AWS_VPC["AWS VPC (Private Network)"]
+        subgraph EKS["Kubernetes Cluster (EKS)"]
+            LB["Load Balancer"]
+            INGRESS["Ingress Controller (HTTPS, Route 53)"]
+            A["FastAPI App"]
+            B["UI (Streamlit)"]
+            E["OpenTelemetry Collector"]
+        end
+    end
+    C["MongoDB (Managed Cloud Service)"]
+    D["Qdrant Cloud"]
+    ROUTE53["Route 53 (DNS)"]
+    USER["User"]
+    USER -- "HTTPS" --> ROUTE53
+    ROUTE53 -- "DNS" --> LB
+    LB -- "K8s Traffic" --> INGRESS
+    INGRESS -- "/api, /ui" --> A
+    INGRESS -- "UI" --> B
+    A -- "Ingestion" --> C
+    A -- "Ingestion" --> D
+    B -- "API Calls" --> A
+    A -- "Query" --> C
+    A -- "Query" --> D
+    A -- "Logs/Traces/Metrics" --> E
+    B -- "Logs/Traces/Metrics" --> E
+    C -. "Integrated with" .-> AWS_VPC
+    D -. "Integrated with" .-> AWS_VPC
+    E -. "Observability" .-> AWS_VPC
+```
+    """, unsafe_allow_html=True)
+    st.markdown("""
+**Key Points:**
+- All resources are deployed inside a secure AWS VPC.
+- Kubernetes (EKS) is used for container orchestration, deployed within the VPC.
+- A Load Balancer distributes incoming traffic to the Kubernetes cluster.
+- Ingress Controller manages secure (HTTPS) access and integrates with Route 53 for DNS.
+- Route 53 provides DNS and HTTPS-enabled endpoints for UI/API.
+- MongoDB is managed as a cloud service and securely connected to the cluster.
+- Qdrant is used as a managed vector database (cloud or dedicated instance).
+- OpenTelemetry is integrated for full-stack observability (logging, tracing, metrics).
+- The ingestion pipeline stores data in both MongoDB and Qdrant.
+- The query pipeline retrieves from both stores as required by the RAG workflow.
     """)
 
  
