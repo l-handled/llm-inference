@@ -1344,10 +1344,10 @@ elif page == "Monitoring & Observability":
                 return val
 
             col1, col2, col3, col4 = st.columns(4)
-            col1.metric("CPU Time (s)", single_value(parsed.get("process_cpu_seconds_total", 0)))
-            col2.metric("Memory (MB)", round(single_value(parsed.get("process_resident_memory_bytes", 0)) / 1e6, 2))
-            col3.metric("API Requests", single_value(parsed.get("request_count_total", 0)))
-            col4.metric("API Errors", single_value(parsed.get("error_count_total", 0)))
+            col1.metric("CPU Time (s)", single_value(parsed.get("process_cpu_seconds_total", 0)), help="Total CPU time consumed by the backend process.")
+            col2.metric("Memory (MB)", round(single_value(parsed.get("process_resident_memory_bytes", 0)) / 1e6, 2), help="Resident memory usage of the backend process in megabytes.")
+            col3.metric("API Requests", single_value(parsed.get("request_count_total", 0)), help="Total number of API requests received by the backend.")
+            col4.metric("API Errors", single_value(parsed.get("error_count_total", 0)), help="Total number of API requests that resulted in an error.")
 
             # --- Charts for Histograms/Time Series ---
             # Example: embedding_time_seconds_bucket
@@ -1360,13 +1360,13 @@ elif page == "Monitoring & Observability":
                         buckets.append((float(le.group(1)) if le.group(1) != "+Inf" else float('inf'), parsed[k]))
                 buckets.sort()
                 df = pd.DataFrame(buckets, columns=["<= seconds", "Count"])
-                st.subheader("🧠 Embedding Time Histogram")
+                st.markdown('<span title="Shows how long embedding generation takes for each chunk.">🧠 Embedding Time Histogram</span>', unsafe_allow_html=True)
                 st.bar_chart(df.set_index("<= seconds"))
 
             # Average chunk size
             if "average_chunk_size" in parsed:
-                st.subheader("📄 Average Chunk Size")
-                st.metric("Avg Chunk Size (chars)", int(single_value(parsed["average_chunk_size"])))
+                st.markdown('<span title="The average number of characters in each document chunk.">📄 Average Chunk Size</span>', unsafe_allow_html=True)
+                st.metric("Avg Chunk Size (chars)", int(single_value(parsed["average_chunk_size"])), help="The average number of characters in each document chunk.")
 
             # Latency histogram
             latency_keys = [k for k in parsed if k.startswith("request_latency_seconds_bucket")]
@@ -1378,7 +1378,7 @@ elif page == "Monitoring & Observability":
                         buckets.append((float(le.group(1)) if le.group(1) != "+Inf" else float('inf'), parsed[k]))
                 buckets.sort()
                 df = pd.DataFrame(buckets, columns=["<= seconds", "Count"])
-                st.subheader("⏱️ Request Latency Histogram")
+                st.markdown('<span title="Shows the distribution of API request latencies (how long requests take).">⏱️ Request Latency Histogram</span>', unsafe_allow_html=True)
                 st.bar_chart(df.set_index("<= seconds"))
 
             # --- All Metrics Table ---
@@ -1447,16 +1447,16 @@ elif page == "Monitoring & Observability":
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
-            st.metric("Avg Response Time", "245ms", "↗️ +12ms")
+            st.metric("Avg Response Time", "245ms", "↗️ +12ms", help="Average time taken to respond to API requests.")
         
         with col2:
-            st.metric("Throughput", "156 req/min", "↗️ +8%")
+            st.metric("Throughput", "156 req/min", "↗️ +8%", help="Number of requests handled per minute.")
         
         with col3:
-            st.metric("Error Rate", "0.2%", "↘️ -0.1%")
+            st.metric("Error Rate", "0.2%", "↘️ -0.1%", help="Percentage of API requests that resulted in an error.")
         
         with col4:
-            st.metric("Memory Usage", "512MB", "↗️ +24MB")
+            st.metric("Memory Usage", "512MB", "↗️ +24MB", help="Memory used by the application.")
         
         # Performance breakdown
         st.subheader("🔍 Performance Breakdown")
@@ -1465,21 +1465,21 @@ elif page == "Monitoring & Observability":
         st.markdown("**🧠 Embedding Model Performance**")
         col1, col2 = st.columns(2)
         with col1:
-            st.metric("Avg Embedding Time", "1.2s", "↘️ -0.3s")
-            st.metric("Tokens/Second", "1,250", "↗️ +50")
+            st.metric("Avg Embedding Time", "1.2s", "↘️ -0.3s", help="Average time to generate an embedding for a chunk.")
+            st.metric("Tokens/Second", "1,250", "↗️ +50", help="Number of tokens processed per second by the embedding model.")
         with col2:
-            st.metric("Model Load Time", "3.4s", "↘️ -0.8s")
-            st.metric("Memory per Embedding", "2.1MB", "↗️ +0.1MB")
+            st.metric("Model Load Time", "3.4s", "↘️ -0.8s", help="Time taken to load the embedding model into memory.")
+            st.metric("Memory per Embedding", "2.1MB", "↗️ +0.1MB", help="Memory used per embedding vector.")
         
         # Database performance
         st.markdown("**🗄️ Database Performance**")
         col1, col2 = st.columns(2)
         with col1:
-            st.metric("MongoDB Query Time", "15ms", "↘️ -3ms")
-            st.metric("Qdrant Search Time", "45ms", "↘️ -8ms")
+            st.metric("MongoDB Query Time", "15ms", "↘️ -3ms", help="Average time for MongoDB queries.")
+            st.metric("Qdrant Search Time", "45ms", "↘️ -8ms", help="Average time for Qdrant vector search queries.")
         with col2:
-            st.metric("Connection Pool", "85%", "↗️ +5%")
-            st.metric("Cache Hit Rate", "92%", "↗️ +2%")
+            st.metric("Connection Pool", "85%", "↗️ +5%", help="Percentage of database connection pool in use.")
+            st.metric("Cache Hit Rate", "92%", "↗️ +2%", help="Percentage of queries served from cache.")
         
         # Performance profiling tools
         st.subheader("🛠️ Performance Profiling Tools")
